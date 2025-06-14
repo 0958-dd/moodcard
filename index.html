@@ -3,161 +3,198 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>心情小卡</title>
+  <title>MoodCard 心情小卡</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; background: #f0f4f8; }
-    #moodCard { 
-      margin-top: 20px; 
-      border-radius: 10px; 
-      padding: 20px; 
-      max-width: 320px; 
-      color: #fff; 
-      display: none;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #fefefe;
+      text-align: center;
+      padding: 2em;
     }
-    #downloadBtn { margin-top: 15px; }
-    /* 背景顏色根據心情 */
-    #moodCard.開心 { background: #4CAF50; }
-    #moodCard.焦慮 { background: #FF9800; }
-    #moodCard.疲憊 { background: #9E9E9E; }
-    #moodCard.沮喪 { background: #F44336; }
+    .card {
+      margin-top: 1em;
+      border: 2px dashed #888;
+      padding: 1em;
+      width: 300px;
+      margin: 1em auto;
+      background: #fff4ec;
+      border-radius: 10px;
+    }
+    select, button {
+      margin-top: 1em;
+      font-size: 1em;
+      padding: 0.5em;
+    }
+    canvas {
+      margin-top: 1em;
+    }
+    .history {
+      margin-top: 2em;
+    }
   </style>
 </head>
 <body>
+  <h1>MoodCard 心情小卡</h1>
 
-<h1>心情小卡</h1>
+  <!-- Google 登入按鈕 -->
+  <div id="g_id_onload"
+       data-client_id="320125835242-4ga3v177d0cc5masfq158bi4h6e8k2b0.apps.googleusercontent.com"
+       data-callback="onSignIn"
+       data-auto_prompt="false">
+  </div>
+  <div class="g_id_signin"
+       data-type="standard"
+       data-size="large"
+       data-theme="outline"
+       data-text="sign_in_with"
+       data-shape="rectangular"
+       data-logo_alignment="left">
+  </div>
 
-<label for="emailInput">Email（模擬登入）:</label><br />
-<input type="email" id="emailInput" placeholder="example@gmail.com" style="width:250px;" /><br /><br />
+  <p id="userDisplay">👤 尚未登入</p>
 
-<label for="moodSelect">選擇心情：</label><br />
-<select id="moodSelect" style="width:150px;">
-  <option value="開心">開心</option>
-  <option value="焦慮">焦慮</option>
-  <option value="疲憊">疲憊</option>
-  <option value="沮喪">沮喪</option>
-</select><br /><br />
+  <label>請選擇今天的心情：</label><br/>
+  <select id="moodSelect">
+    <option value="開心">😊 開心 / Happy</option>
+    <option value="焦慮">😰 焦慮 / Anxious</option>
+    <option value="疲憊">😩 疲憊 / Tired</option>
+    <option value="沮喪">😞 沮喪 / Depressed</option>
+  </select><br/>
+  <button onclick="generateCard()">產生心情小卡</button>
 
-<button id="generateBtn">產生心情卡片</button>
+  <div class="card" id="moodCard" style="display: none;">
+    <h2 id="moodText"></h2>
+    <p id="moodDesc"></p>
+    <button onclick="downloadCard()">下載小卡</button>
+  </div>
 
-<div id="moodCard">
-  <div id="moodText" style="font-size: 24px; font-weight: bold;"></div>
-  <pre id="moodDesc" style="white-space: pre-wrap; font-size: 16px; margin-top:10px;"></pre>
-</div>
+  <div class="history">
+    <h3>過去的心情記錄</h3>
+    <ul id="historyList"></ul>
+  </div>
 
-<button id="downloadBtn" style="display:none;">下載小卡圖片</button>
+  <canvas id="chart" width="400" height="200"></canvas>
+  <canvas id="canvas" width="400" height="300" style="display: none;"></canvas>
 
-<script>
-  // 模擬登入帳號
-  let currentUser = null;
-
-  // 多句心情描述
-  const moodDescriptions = {
-    "開心": [
-      "今天的你充滿陽光與正能量，繼續保持這份好心情吧！",
-      "笑容是你最美的裝飾，讓快樂感染更多人吧！",
-      "這世界因你而更美好，保持這份光芒！"
-    ],
-    "焦慮": [
-      "可能事情有點多，別忘了深呼吸、喝杯水，慢慢來。",
-      "感到不安是正常的，請給自己一點空間。",
-      "即使現在心亂如麻，你依然值得溫柔以待。"
-    ],
-    "疲憊": [
-      "辛苦了，適時放鬆是對自己的愛護。",
-      "累了就好好休息，明天會更好。",
-      "給自己充電的時間，不要太苛求自己。"
-    ],
-    "沮喪": [
-      "黑暗過後，陽光總會來臨。",
-      "失落是暫時的，請相信自己的力量。",
-      "允許自己難過，但別放棄希望。"
-    ]
-  };
-
-  // Emoji 對應
-  const moodEmojis = {
-    "開心": "😊",
-    "焦慮": "😰",
-    "疲憊": "😩",
-    "沮喪": "😞"
-  };
-
-  const emailInput = document.getElementById('emailInput');
-  const moodSelect = document.getElementById('moodSelect');
-  const generateBtn = document.getElementById('generateBtn');
-  const moodCard = document.getElementById('moodCard');
-  const moodText = document.getElementById('moodText');
-  const moodDesc = document.getElementById('moodDesc');
-  const downloadBtn = document.getElementById('downloadBtn');
-
-  function generateCard() {
-    currentUser = emailInput.value.trim() || null;
-    const mood = moodSelect.value;
-    const date = new Date().toLocaleDateString();
-
-    // 隨機挑一句描述
-    const messages = moodDescriptions[mood];
-    const randomMessage = messages[Math.floor(Math.random() * messages.length)];
-
-    const emoji = moodEmojis[mood];
-    const userText = currentUser ? `👤 使用者：${currentUser}` : '👤 尚未登入';
-
-    // 顯示卡片內容
-    moodText.innerText = `${emoji} 心情：${mood}`;
-    moodDesc.innerText = `${randomMessage}\n\n${userText}\n📅 日期：${date}`;
-
-    // 設定卡片背景色（class）
-    moodCard.className = '';
-    moodCard.classList.add(mood);
-    moodCard.style.display = 'block';
-
-    downloadBtn.style.display = 'inline-block';
-  }
-
-  function downloadCard() {
-    // 建立 canvas，將卡片內容畫上去
-    const canvas = document.createElement('canvas');
-    canvas.width = 400;
-    canvas.height = 300;
-    const ctx = canvas.getContext('2d');
-
-    // 背景顏色依心情改變
-    const bgColors = {
-      "開心": "#4CAF50",
-      "焦慮": "#FF9800",
-      "疲憊": "#9E9E9E",
-      "沮喪": "#F44336"
+  <script>
+    const moodDescriptions = {
+      "開心": "今天的你充滿陽光與正能量，繼續保持這份好心情吧！",
+      "焦慮": "可能事情有點多，別忘了深呼吸、喝杯水，慢慢來。",
+      "疲憊": "工作或學習讓你有些疲倦，記得適時休息是很重要的。",
+      "沮喪": "有點低落沒關係，你已經很努力了，明天會更好。"
     };
-    const mood = moodSelect.value;
-    ctx.fillStyle = bgColors[mood] || '#333';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // 文字設定
-    ctx.fillStyle = '#fff';
-    ctx.font = '28px sans-serif';
-    ctx.fillText(moodText.innerText, 20, 60);
+    function generateCard() {
+      const mood = document.getElementById('moodSelect').value;
+      document.getElementById('moodText').innerText = `心情：${mood}`;
+      document.getElementById('moodDesc').innerText = moodDescriptions[mood];
+      document.getElementById('moodCard').style.display = 'block';
 
-    ctx.font = '18px sans-serif';
-    const lines = moodDesc.innerText.split('\n');
-    for (let i = 0; i < lines.length; i++) {
-      ctx.fillText(lines[i], 20, 100 + i * 30);
+      const record = { date: new Date().toLocaleDateString(), mood: mood };
+      const history = JSON.parse(localStorage.getItem('moodHistory') || '[]');
+      history.push(record);
+      localStorage.setItem('moodHistory', JSON.stringify(history));
+      updateHistory();
+      updateChart();
     }
 
-    // 產生下載連結
-    const link = document.createElement('a');
-    link.download = `心情小卡_${mood}_${new Date().toISOString().slice(0,10)}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-  }
+    function updateHistory() {
+      const list = document.getElementById('historyList');
+      const history = JSON.parse(localStorage.getItem('moodHistory') || '[]');
+      list.innerHTML = '';
+      history.slice(-10).reverse().forEach(item => {
+        const li = document.createElement('li');
+        li.innerText = `${item.date} - ${item.mood}`;
+        list.appendChild(li);
+      });
+    }
 
-  generateBtn.addEventListener('click', generateCard);
-  downloadBtn.addEventListener('click', downloadCard);
-</script>
+    function updateChart() {
+      const history = JSON.parse(localStorage.getItem('moodHistory') || '[]');
+      const count = { "開心": 0, "焦慮": 0, "疲憊": 0, "沮喪": 0 };
+      history.forEach(item => count[item.mood]++);
+      chart.data.datasets[0].data = Object.values(count);
+      chart.update();
+    }
 
-</body>
-</html>
+    function downloadCard() {
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff4ec";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#333";
+      ctx.font = "20px sans-serif";
+      ctx.fillText(document.getElementById("moodText").innerText, 20, 100);
+      ctx.font = "16px sans-serif";
+      ctx.fillText(document.getElementById("moodDesc").innerText, 20, 140);
+      const link = document.createElement("a");
+      link.download = "moodcard.png";
+      link.href = canvas.toDataURL();
+      link.click();
+    }
+
+    let currentUser = null;
+
+    function onSignIn(response) {
+      const credential = response.credential;
+      const payload = parseJwt(credential);
+      currentUser = payload.email;
+      document.getElementById('userDisplay').innerText = "👤 使用者：" + currentUser;
+      alert("已登入：" + currentUser);
+      loadUserData();
+    }
+
+    function parseJwt(token) {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      return JSON.parse(jsonPayload);
+    }
+
+    function loadUserData() {
+      const data = JSON.parse(localStorage.getItem('user_' + currentUser) || '[]');
+      localStorage.setItem('moodHistory', JSON.stringify(data));
+      updateHistory();
+      updateChart();
+    }
+
+    function saveUserData() {
+      if (currentUser) {
+        const data = JSON.parse(localStorage.getItem('moodHistory') || '[]');
+        localStorage.setItem('user_' + currentUser, JSON.stringify(data));
+      }
+    }
+
+    const originalSetItem = localStorage.setItem;
+    localStorage.setItem = function (key, value) {
+      originalSetItem.apply(this, arguments);
+      if (key === 'moodHistory') {
+        saveUserData();
+      }
+    }
+
+    const ctx = document.getElementById('chart').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['開心', '焦慮', '疲憊', '沮喪'],
+        datasets: [{
+          label: '心情統計',
+          data: [0, 0, 0, 0],
+          backgroundColor: ['#fbc02d', '#ef5350', '#90caf9', '#a1887f']
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
 
     updateHistory();
     updateChart();
