@@ -85,12 +85,23 @@
       "疲憊": "工作或學習讓你有些疲倦，記得適時休息是很重要的。",
       "沮喪": "有點低落沒關係，你已經很努力了，明天會更好。"
     };
+function generateCard() {
+  const mood = document.getElementById('moodSelect').value;
+  const date = new Date().toLocaleDateString();
+  const emoji = { "開心": "😊", "焦慮": "😰", "疲憊": "😩", "沮喪": "😞" }[mood];
+  const userText = currentUser ? `👤 使用者：${currentUser}` : '👤 尚未登入';
+  
+  document.getElementById('moodText').innerText = `${emoji} 心情：${mood}`;
+  document.getElementById('moodDesc').innerText = `${moodDescriptions[mood]}\n\n${userText}\n📅 日期：${date}`;
+  document.getElementById('moodCard').style.display = 'block';
 
-    function generateCard() {
-      const mood = document.getElementById('moodSelect').value;
-      document.getElementById('moodText').innerText = `心情：${mood}`;
-      document.getElementById('moodDesc').innerText = moodDescriptions[mood];
-      document.getElementById('moodCard').style.display = 'block';
+  const record = { date: date, mood: mood };
+  const history = JSON.parse(localStorage.getItem('moodHistory') || '[]');
+  history.push(record);
+  localStorage.setItem('moodHistory', JSON.stringify(history));
+  updateHistory();
+  updateChart();
+}
 
       const record = { date: new Date().toLocaleDateString(), mood: mood };
       const history = JSON.parse(localStorage.getItem('moodHistory') || '[]');
@@ -126,9 +137,13 @@
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = "#333";
       ctx.font = "20px sans-serif";
-      ctx.fillText(document.getElementById("moodText").innerText, 20, 100);
-      ctx.font = "16px sans-serif";
-      ctx.fillText(document.getElementById("moodDesc").innerText, 20, 140);
+      ctx.fillText(document.getElementById("moodText").innerText, 20, 60);
+ctx.font = "16px sans-serif";
+const lines = document.getElementById("moodDesc").innerText.split("\\n");
+ctx.fillText(lines[0], 20, 100);
+ctx.fillText(lines[1], 20, 140);
+ctx.fillText(lines[2], 20, 180);
+
       const link = document.createElement("a");
       link.download = "moodcard.png";
       link.href = canvas.toDataURL();
