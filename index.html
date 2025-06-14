@@ -79,31 +79,33 @@
   <canvas id="canvas" width="400" height="300" style="display: none;"></canvas>
 
   <script>
-    const moodDescriptions = {
-      "開心": "今天的你充滿陽光與正能量，繼續保持這份好心情吧！",
-      "焦慮": "可能事情有點多，別忘了深呼吸、喝杯水，慢慢來。",
-      "疲憊": "工作或學習讓你有些疲倦，記得適時休息是很重要的。",
-      "沮喪": "有點低落沒關係，你已經很努力了，明天會更好。"
-    };
-function generateCard() {
-  const mood = document.getElementById('moodSelect').value;
-  const date = new Date().toLocaleDateString();
-  const emoji = { "開心": "😊", "焦慮": "😰", "疲憊": "😩", "沮喪": "😞" }[mood];
-  const userText = currentUser ? `👤 使用者：${currentUser}` : '👤 尚未登入';
-  
-  document.getElementById('moodText').innerText = `${emoji} 心情：${mood}`;
-  document.getElementById('moodDesc').innerText = `${moodDescriptions[mood]}\n\n${userText}\n📅 日期：${date}`;
-  document.getElementById('moodCard').style.display = 'block';
+    let currentUser = null;
 
-  const record = { date: date, mood: mood };
-  const history = JSON.parse(localStorage.getItem('moodHistory') || '[]');
-  history.push(record);
-  localStorage.setItem('moodHistory', JSON.stringify(history));
-  updateHistory();
-  updateChart();
-}
+    const emojis = { "開心": "😊", "焦慮": "😰", "疲憊": "😩", "沮喪": "😞" };
 
-      const record = { date: new Date().toLocaleDateString(), mood: mood };
+    function generateDescription(mood, userEmail) {
+      const base = {
+        "開心": "今天的你像小太陽一樣閃耀 ✨ 保持好心情！",
+        "焦慮": "事情再多也要記得呼吸，放鬆一下 🙂",
+        "疲憊": "今天好像用光了全部的能量？給自己多一點休息 ☕",
+        "沮喪": "低潮也沒關係，你真的已經很努力了 ❤️"
+      };
+      const name = userEmail ? userEmail.split('@')[0] : "你";
+      return `${base[mood]}\n💌 ${name}，加油喔！`;
+    }
+
+    function generateCard() {
+      const mood = document.getElementById('moodSelect').value;
+      const date = new Date().toLocaleDateString();
+      const emoji = emojis[mood];
+      const userText = currentUser ? `👤 使用者：${currentUser}` : '👤 尚未登入';
+
+      document.getElementById('moodText').innerText = `${emoji} 心情：${mood}`;
+      document.getElementById('moodDesc').innerText =
+        `${generateDescription(mood, currentUser)}\n📅 日期：${date}\n${userText}`;
+      document.getElementById('moodCard').style.display = 'block';
+
+      const record = { date: date, mood: mood };
       const history = JSON.parse(localStorage.getItem('moodHistory') || '[]');
       history.push(record);
       localStorage.setItem('moodHistory', JSON.stringify(history));
@@ -138,19 +140,18 @@ function generateCard() {
       ctx.fillStyle = "#333";
       ctx.font = "20px sans-serif";
       ctx.fillText(document.getElementById("moodText").innerText, 20, 60);
-ctx.font = "16px sans-serif";
-const lines = document.getElementById("moodDesc").innerText.split("\\n");
-ctx.fillText(lines[0], 20, 100);
-ctx.fillText(lines[1], 20, 140);
-ctx.fillText(lines[2], 20, 180);
+
+      ctx.font = "16px sans-serif";
+      const lines = document.getElementById("moodDesc").innerText.split("\n");
+      lines.forEach((line, index) => {
+        ctx.fillText(line, 20, 100 + index * 30);
+      });
 
       const link = document.createElement("a");
       link.download = "moodcard.png";
       link.href = canvas.toDataURL();
       link.click();
     }
-
-    let currentUser = null;
 
     function onSignIn(response) {
       const credential = response.credential;
@@ -173,6 +174,7 @@ ctx.fillText(lines[2], 20, 180);
     function loadUserData() {
       const data = JSON.parse(localStorage.getItem('user_' + currentUser) || '[]');
       localStorage.setItem('moodHistory', JSON.stringify(data));
+      chart.data.datasets[0].data = [0, 0, 0, 0];
       updateHistory();
       updateChart();
     }
