@@ -1,44 +1,65 @@
-
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <title>MoodCard 心情小卡</title>
+  <title>MoodCard 心情小卡 ✨</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
-      background: #fefefe;
+      background: #fffdf7;
       text-align: center;
       padding: 2em;
+      color: #333;
+    }
+    h1 {
+      font-size: 2em;
+      color: #ff7e67;
     }
     .card {
       margin-top: 1em;
-      border: 2px dashed #888;
-      padding: 1em;
-      width: 300px;
+      border: 3px dotted #ffb6b9;
+      padding: 1.5em;
+      width: 320px;
       margin: 1em auto;
-      background: #fff4ec;
-      border-radius: 10px;
+      background: #fff0f5;
+      border-radius: 20px;
+      box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
     }
-    select, button {
+    select, button, textarea {
       margin-top: 1em;
       font-size: 1em;
-      padding: 0.5em;
+      padding: 0.6em;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+    textarea {
+      width: 80%;
     }
     canvas {
-      margin-top: 1em;
-    }
-    .history {
       margin-top: 2em;
+    }
+    .history, .chatbox {
+      margin-top: 2em;
+    }
+    .chatbox ul {
+      list-style: none;
+      padding: 0;
+    }
+    .chatbox li {
+      background: #ffe0e9;
+      margin: 5px auto;
+      padding: 0.5em 1em;
+      border-radius: 10px;
+      width: 70%;
+      text-align: left;
     }
   </style>
 </head>
 <body>
-  <h1>MoodCard 心情小卡</h1>
+  <h1>🧸 MoodCard 心情小卡</h1>
 
-  <!-- Google 登入按鈕 -->
   <div id="g_id_onload"
        data-client_id="320125835242-4ga3v177d0cc5masfq158bi4h6e8k2b0.apps.googleusercontent.com"
        data-callback="onSignIn"
@@ -49,50 +70,82 @@
        data-size="large"
        data-theme="outline"
        data-text="sign_in_with"
-       data-shape="rectangular"
+       data-shape="pill"
        data-logo_alignment="left">
   </div>
 
   <p id="userDisplay">👤 尚未登入</p>
 
-  <label>請選擇今天的心情：</label><br/>
+  <label>🌈 請選擇今天的心情：</label><br/>
   <select id="moodSelect">
-    <option value="開心">😊 開心 / Happy</option>
-    <option value="焦慮">😰 焦慮 / Anxious</option>
-    <option value="疲憊">😩 疲憊 / Tired</option>
-    <option value="沮喪">😞 沮喪 / Depressed</option>
+    <option value="開心">😊 開心</option>
+    <option value="焦慮">😰 焦慮</option>
+    <option value="疲憊">😩 疲憊</option>
+    <option value="沮喪">😞 沮喪</option>
   </select><br/>
-  <button onclick="generateCard()">產生心情小卡</button>
+  <button onclick="generateCard()">🎴 產生心情小卡</button>
 
   <div class="card" id="moodCard" style="display: none;">
     <h2 id="moodText"></h2>
     <p id="moodDesc"></p>
-    <button onclick="downloadCard()">下載小卡</button>
+    <p id="moodAdvice" style="font-style: italic; color:#aa4488;"></p>
+    <button onclick="downloadCard()">⬇️ 下載小卡</button>
   </div>
 
   <div class="history">
-    <h3>過去的心情記錄</h3>
+    <h3>📅 過去的心情記錄</h3>
     <ul id="historyList"></ul>
+  </div>
+
+  <div class="chatbox">
+    <h3>🗨️ 心情交流牆（匿名）</h3>
+    <textarea id="chatInput" placeholder="留言一些想說的話..."></textarea><br/>
+    <button onclick="submitChat()">送出留言</button>
+    <ul id="chatList"></ul>
   </div>
 
   <canvas id="chart" width="400" height="200"></canvas>
   <canvas id="canvas" width="400" height="300" style="display: none;"></canvas>
 
   <script>
-    const moodDescriptions = {
-      "開心": "今天的你充滿陽光與正能量，繼續保持這份好心情吧！",
-      "焦慮": "可能事情有點多，別忘了深呼吸、喝杯水，慢慢來。",
-      "疲憊": "工作或學習讓你有些疲倦，記得適時休息是很重要的。",
-      "沮喪": "有點低落沒關係，你已經很努力了，明天會更好。"
+    const moodMessages = {
+      "開心": ["今天的你充滿陽光與正能量！", "你的笑容是世界最溫暖的光。", "別忘了把快樂分享出去！"],
+      "焦慮": ["先深呼吸，慢慢來，一步步就好。", "你正在努力中，這很棒。", "照顧自己，是最重要的事。"],
+      "疲憊": ["今天辛苦了，別忘記放鬆一下。", "好好休息，是對自己最好的獎勵。", "晚點來杯熱可可吧 ☕"],
+      "沮喪": ["你已經很棒了，別太苛責自己。", "願你明天比今天更平靜。", "你的努力不會被白費。"]
     };
+
+    let currentUser = null;
+
+    function onSignIn(response) {
+      const credential = response.credential;
+      const payload = parseJwt(credential);
+      currentUser = payload.email;
+      document.getElementById('userDisplay').innerText = "👤 使用者：" + currentUser;
+      loadUserData();
+    }
+
+    function parseJwt(token) {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(c =>
+        '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+      ).join(''));
+      return JSON.parse(jsonPayload);
+    }
 
     function generateCard() {
       const mood = document.getElementById('moodSelect').value;
-      document.getElementById('moodText').innerText = `心情：${mood}`;
-      document.getElementById('moodDesc').innerText = moodDescriptions[mood];
+      const emoji = { "開心": "😊", "焦慮": "😰", "疲憊": "😩", "沮喪": "😞" }[mood];
+      const date = new Date().toLocaleDateString();
+      const userText = currentUser ? `👤 使用者：${currentUser}` : '👤 匿名使用者';
+      const randomAdvice = moodMessages[mood][Math.floor(Math.random() * moodMessages[mood].length)];
+      document.getElementById('moodText').innerText = `${emoji} 心情：${mood}`;
+      document.getElementById('moodDesc').innerText = `${userText} - ${date}`;
+      document.getElementById('moodAdvice').innerText = randomAdvice;
       document.getElementById('moodCard').style.display = 'block';
 
-      const record = { date: new Date().toLocaleDateString(), mood: mood };
+      const record = { date: date, mood: mood };
       const history = JSON.parse(localStorage.getItem('moodHistory') || '[]');
       history.push(record);
       localStorage.setItem('moodHistory', JSON.stringify(history));
@@ -119,40 +172,43 @@
       chart.update();
     }
 
+    function submitChat() {
+      const input = document.getElementById('chatInput').value.trim();
+      if (input) {
+        const chats = JSON.parse(localStorage.getItem('chatBoard') || '[]');
+        chats.push(input);
+        localStorage.setItem('chatBoard', JSON.stringify(chats));
+        document.getElementById('chatInput').value = '';
+        loadChats();
+      }
+    }
+
+    function loadChats() {
+      const list = document.getElementById('chatList');
+      const chats = JSON.parse(localStorage.getItem('chatBoard') || '[]');
+      list.innerHTML = '';
+      chats.slice(-10).reverse().forEach(msg => {
+        const li = document.createElement('li');
+        li.innerText = msg;
+        list.appendChild(li);
+      });
+    }
+
     function downloadCard() {
       const canvas = document.getElementById("canvas");
       const ctx = canvas.getContext("2d");
-      ctx.fillStyle = "#fff4ec";
+      ctx.fillStyle = "#fff0f5";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = "#333";
       ctx.font = "20px sans-serif";
-      ctx.fillText(document.getElementById("moodText").innerText, 20, 100);
+      ctx.fillText(document.getElementById("moodText").innerText, 20, 60);
       ctx.font = "16px sans-serif";
-      ctx.fillText(document.getElementById("moodDesc").innerText, 20, 140);
+      ctx.fillText(document.getElementById("moodDesc").innerText, 20, 100);
+      ctx.fillText(document.getElementById("moodAdvice").innerText, 20, 140);
       const link = document.createElement("a");
       link.download = "moodcard.png";
       link.href = canvas.toDataURL();
       link.click();
-    }
-
-    let currentUser = null;
-
-    function onSignIn(response) {
-      const credential = response.credential;
-      const payload = parseJwt(credential);
-      currentUser = payload.email;
-      document.getElementById('userDisplay').innerText = "👤 使用者：" + currentUser;
-      alert("已登入：" + currentUser);
-      loadUserData();
-    }
-
-    function parseJwt(token) {
-      const base64Url = token.split('.')[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
-        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-      }).join(''));
-      return JSON.parse(jsonPayload);
     }
 
     function loadUserData() {
@@ -185,7 +241,7 @@
         datasets: [{
           label: '心情統計',
           data: [0, 0, 0, 0],
-          backgroundColor: ['#fbc02d', '#ef5350', '#90caf9', '#a1887f']
+          backgroundColor: ['#ffd54f', '#ef5350', '#90caf9', '#a1887f']
         }]
       },
       options: {
@@ -198,6 +254,7 @@
 
     updateHistory();
     updateChart();
+    loadChats();
   </script>
 </body>
 </html>
